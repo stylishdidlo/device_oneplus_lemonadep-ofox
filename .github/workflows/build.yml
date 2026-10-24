@@ -69,10 +69,14 @@ jobs:
         sudo rm -rf "/usr/local/share/boost"
         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
         sudo swapoff -a || true
-        sudo fallocate -l 16G /mnt/swapfile || sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=16384
+        # Allocate 32GB Swap to completely eliminate OOM on Soong
+        sudo fallocate -l 32G /mnt/swapfile || sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=32768
         sudo chmod 600 /mnt/swapfile
         sudo mkswap /mnt/swapfile
         sudo swapon /mnt/swapfile
+        # Set swappiness and cache pressure for memory-heavy compilation
+        sudo sysctl vm.swappiness=100
+        sudo sysctl vm.vfs_cache_pressure=50
         free -h
         df -h
 
@@ -128,10 +132,15 @@ jobs:
         ccache -z
         export FOX_BUILD_DEVICE="${{ github.event.inputs.DEVICE_NAME }}"
         export ALLOW_MISSING_DEPENDENCIES=true
+
+        # Aggressive Go GC & memory limiting to prevent soong_build OOM
+        export GOGC=30
+        export GOMEMLIMIT=10GiB
+
         source build/envsetup.sh
         lunch ${{ github.event.inputs.MAKEFILE_NAME }}-bp2a-eng || lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
 
-        # Background heartbeat to keep GitHub Actions alive and log resource usage every 60s
+        # Background heartbeat logging every 60s
         (
           while true; do
             sleep 60
