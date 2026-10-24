@@ -62,12 +62,18 @@ jobs:
         large-packages: true
         swap-storage: false
 
-    - name: Maximize Build Space
+    - name: Maximize Build Space and Configure Swap
       run: |
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /opt/ghc
         sudo rm -rf "/usr/local/share/boost"
         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        # Allocate 16GB swap to prevent OOM / SIGTERM during ninja generation
+        sudo fallocate -l 16G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=16384
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        free -h
         df -h
 
     - name: Set up Environment
