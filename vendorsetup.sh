@@ -42,5 +42,3 @@ else
 	fi
 fi
 
-add_lunch_combo twrp_lemonadep-bp2a-eng
-add_lunch_combo twrp_lemonadep-eng
