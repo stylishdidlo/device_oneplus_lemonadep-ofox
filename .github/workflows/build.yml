@@ -50,7 +50,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Free Disk Space
       uses: jlumbroso/free-disk-space@main
@@ -73,7 +73,14 @@ jobs:
     - name: Set up Environment
       run: |
         sudo apt-get update
-        sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev           libc6-dev-i386 x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils           xsltproc unzip fontconfig libncurses5 libncurses5-dev python3 python3-pip rsync bc           libssl-dev libfl-dev liblz4-tool lzop libarchive-tools
+        sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
+          libc6-dev-i386 x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils \
+          xsltproc unzip fontconfig libncurses5 libncurses5-dev python3 python3-pip rsync bc \
+          libssl-dev libfl-dev liblz4-tool lzop libarchive-tools libncurses6 libncurses-dev || \
+        sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
+          libc6-dev-i386 x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils \
+          xsltproc unzip fontconfig python3 python3-pip rsync bc \
+          libssl-dev libfl-dev liblz4-tool lzop libarchive-tools libncurses6 libncurses-dev
         sudo mkdir -p /usr/local/bin
         sudo curl -o /usr/local/bin/repo https://storage.googleapis.com/git-repo-downloads/repo
         sudo chmod a+x /usr/local/bin/repo
@@ -133,6 +140,6 @@ jobs:
           ### OrangeFox Recovery Android 16
           - **Device:** OnePlus 9 Pro (lemonadep / OnePlus9Pro)
           - **Base Manifest:** OrangeFox fox_16.0 (Android 16)
-          - **Build Artifacts:** Included boot/recovery/zip images.
+          - **Build Target:** bootimage (OnePlus 9 Pro uses boot-as-recovery)
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
