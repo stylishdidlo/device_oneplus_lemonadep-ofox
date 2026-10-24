@@ -35,8 +35,12 @@ if [ "$1" = "$FDEVICE" -o "$FOX_BUILD_DEVICE" = "$FDEVICE" ]; then
 	export OF_STATUS_INDENT_RIGHT=48
 	export TARGET_DEVICE_ALT="OnePlus9Pro,lemonadep"
 	export OF_MAINTAINER="stylishdidlo"
+	export OF_FL_PATH1="/sys/class/leds/vibrator"
 else
 	if [ -z "$FOX_BUILD_DEVICE" -a -z "$BASH_SOURCE" ]; then
 		echo "I: This script requires bash. Not processing the $FDEVICE $(basename $0)"
 	fi
 fi
+
+add_lunch_combo twrp_lemonadep-bp2a-eng
+add_lunch_combo twrp_lemonadep-eng
