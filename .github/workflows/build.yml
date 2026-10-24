@@ -1,0 +1,138 @@
+name: OrangeFox Recovery Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      SYNC_URL:
+        description: 'SYNC_URL (Manifest)'
+        required: true
+        default: 'https://gitlab.com/OrangeFox/Manifest.git'
+      MANIFEST_BRANCH:
+        description: 'MANIFEST_BRANCH'
+        required: true
+        default: 'fox_16.0'
+      DEVICE_TREE_URL:
+        description: 'DEVICE_TREE_URL'
+        required: true
+        default: 'https://github.com/stylishdidlo/device_oneplus_lemonadep-ofox'
+      DEVICE_TREE_BRANCH:
+        description: 'DEVICE_TREE_BRANCH'
+        required: true
+        default: 'fox_16.0'
+      DEVICE_PATH:
+        description: 'DEVICE_PATH'
+        required: true
+        default: 'device/oneplus/lemonadep'
+      COMMON_TREE_URL:
+        description: 'COMMON_TREE_URL'
+        required: true
+        default: 'https://github.com/TeamWin/android_device_oneplus_sm8350-common'
+      COMMON_TREE_BRANCH:
+        description: 'COMMON_TREE_BRANCH'
+        required: true
+        default: 'android-12.1'
+      COMMON_PATH:
+        description: 'COMMON_PATH'
+        required: true
+        default: 'device/oneplus/sm8350-common'
+      DEVICE_NAME:
+        description: 'DEVICE_NAME'
+        required: true
+        default: 'lemonadep'
+      MAKEFILE_NAME:
+        description: 'MAKEFILE_NAME'
+        required: true
+        default: 'twrp_lemonadep'
+      BUILD_TARGET:
+        description: 'BUILD_TARGET'
+        required: true
+        default: 'bootimage'
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Free Disk Space
+      uses: jlumbroso/free-disk-space@main
+      with:
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: true
+        swap-storage: false
+
+    - name: Maximize Build Space
+      run: |
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+        df -h
+
+    - name: Set up Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev           libc6-dev-i386 x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils           xsltproc unzip fontconfig libncurses5 libncurses5-dev python3 python3-pip rsync bc           libssl-dev libfl-dev liblz4-tool lzop libarchive-tools
+        sudo mkdir -p /usr/local/bin
+        sudo curl -o /usr/local/bin/repo https://storage.googleapis.com/git-repo-downloads/repo
+        sudo chmod a+x /usr/local/bin/repo
+        git config --global user.name "stylishdidlo"
+        git config --global user.email "stylishdidlo@github.com"
+        git config --global color.ui false
+
+    - name: Initialize and Sync Repo
+      run: |
+        mkdir -p ~/work
+        cd ~/work
+        repo init --depth=1 -u ${{ github.event.inputs.SYNC_URL }} -b ${{ github.event.inputs.MANIFEST_BRANCH }}
+        repo sync -j$(nproc --all) --force-sync --no-clone-bundle --no-tags --optimized-fetch --prune
+
+    - name: Clone Device Trees
+      run: |
+        cd ~/work
+        rm -rf ${{ github.event.inputs.DEVICE_PATH }}
+        rm -rf ${{ github.event.inputs.COMMON_PATH }}
+        git clone --depth=1 -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} ${{ github.event.inputs.DEVICE_TREE_URL }} ${{ github.event.inputs.DEVICE_PATH }}
+        git clone --depth=1 -b ${{ github.event.inputs.COMMON_TREE_BRANCH }} ${{ github.event.inputs.COMMON_TREE_URL }} ${{ github.event.inputs.COMMON_PATH }}
+
+    - name: Build OrangeFox
+      run: |
+        cd ~/work
+        export FOX_BUILD_DEVICE="${{ github.event.inputs.DEVICE_NAME }}"
+        export ALLOW_MISSING_DEPENDENCIES=true
+        source build/envsetup.sh
+        lunch ${{ github.event.inputs.MAKEFILE_NAME }}-bp2a-eng || lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
+        mka ${{ github.event.inputs.BUILD_TARGET }}
+
+    - name: Prepare Artifacts
+      run: |
+        cd ~/work
+        mkdir -p ~/artifacts
+        find out/target/product/${{ github.event.inputs.DEVICE_NAME }}/ -name "OrangeFox*.zip" -exec cp {} ~/artifacts/ \;
+        find out/target/product/${{ github.event.inputs.DEVICE_NAME }}/ -name "boot.img" -exec cp {} ~/artifacts/OrangeFox-boot-${{ github.event.inputs.DEVICE_NAME }}.img \;
+        find out/target/product/${{ github.event.inputs.DEVICE_NAME }}/ -name "recovery.img" -exec cp {} ~/artifacts/OrangeFox-recovery-${{ github.event.inputs.DEVICE_NAME }}.img \;
+        find out/target/product/${{ github.event.inputs.DEVICE_NAME }}/ -name "vendor_boot.img" -exec cp {} ~/artifacts/OrangeFox-vendor_boot-${{ github.event.inputs.DEVICE_NAME }}.img \;
+        ls -la ~/artifacts
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: OrangeFox-${{ github.event.inputs.DEVICE_NAME }}-Android16
+        path: ~/artifacts/*
+        if-no-files-found: error
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+      with:
+        files: ~/artifacts/*
+        tag_name: Fox16-${{ github.run_number }}
+        name: OrangeFox Recovery Android 16 for OnePlus 9 Pro (lemonadep)
+        body: |
+          ### OrangeFox Recovery Android 16
+          - **Device:** OnePlus 9 Pro (lemonadep / OnePlus9Pro)
+          - **Base Manifest:** OrangeFox fox_16.0 (Android 16)
+          - **Build Artifacts:** Included boot/recovery/zip images.
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
