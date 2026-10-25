@@ -69,12 +69,10 @@ jobs:
         sudo rm -rf "/usr/local/share/boost"
         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
         sudo swapoff -a || true
-        # Allocate 32GB Swap to completely eliminate OOM on Soong
         sudo fallocate -l 32G /mnt/swapfile || sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=32768
         sudo chmod 600 /mnt/swapfile
         sudo mkswap /mnt/swapfile
         sudo swapon /mnt/swapfile
-        # Set swappiness and cache pressure for memory-heavy compilation
         sudo sysctl vm.swappiness=100
         sudo sysctl vm.vfs_cache_pressure=50
         free -h
@@ -132,29 +130,45 @@ jobs:
         ccache -z
         export FOX_BUILD_DEVICE="${{ github.event.inputs.DEVICE_NAME }}"
         export ALLOW_MISSING_DEPENDENCIES=true
-
-        # Aggressive Go GC & memory limiting to prevent soong_build OOM
         export GOGC=30
         export GOMEMLIMIT=10GiB
 
         source build/envsetup.sh
         lunch ${{ github.event.inputs.MAKEFILE_NAME }}-bp2a-eng || lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
 
-        # Background heartbeat logging every 60s
         (
           while true; do
             sleep 60
-            echo "[Heartbeat $(date +%T)] Memory & Swap usage:"
+            echo "[Heartbeat $(date +%T)] Memory & Swap:"
             free -h
           done
         ) &
         HEARTBEAT_PID=$!
 
         export NINJA_ARGS="-j2"
-        mka ${{ github.event.inputs.BUILD_TARGET }} -j2
-        
+        # Run mka with full tee to a persistent log file so it is never lost
+        set +e
+        mka ${{ github.event.inputs.BUILD_TARGET }} -j2 2>&1 | tee ~/build.log
+        BUILD_STATUS=${PIPESTATUS[0]}
+        set -e
         kill $HEARTBEAT_PID || true
         ccache -s
+
+        echo "=== LAST 150 LINES OF BUILD LOG ==="
+        tail -n 150 ~/build.log
+
+        if [ $BUILD_STATUS -ne 0 ]; then
+          echo "ERROR: mka failed with code $BUILD_STATUS"
+          exit $BUILD_STATUS
+        fi
+
+    - name: Save Diagnostic Build Log
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-log-diagnostic
+        path: /home/runner/build.log
+        if-no-files-found: ignore
 
     - name: Prepare Artifacts
       run: |
