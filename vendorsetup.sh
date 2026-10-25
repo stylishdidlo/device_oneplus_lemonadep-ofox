@@ -20,7 +20,7 @@ fi
 if [ "$1" = "$FDEVICE" -o "$FOX_BUILD_DEVICE" = "$FDEVICE" ]; then
 	export FOX_AB_DEVICE=1
 	export FOX_VIRTUAL_AB_DEVICE=1
-	export OF_VIRTUAL_AB_DEVICE=1
+	# export OF_VIRTUAL_AB_DEVICE=1 (obsolete in fox_16)
 	export FOX_USE_BASH_SHELL=1
 	export FOX_USE_SED_BINARY=1
 	export FOX_USE_TAR_BINARY=1
