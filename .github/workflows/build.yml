@@ -1,6 +1,8 @@
 name: OrangeFox Recovery Build
 
 on:
+  push:
+    branches: [ fox_16.0 ]
   workflow_dispatch:
     inputs:
       SYNC_URL:
