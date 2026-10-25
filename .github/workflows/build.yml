@@ -134,12 +134,14 @@ jobs:
         ccache -z
         export FOX_BUILD_DEVICE="${{ github.event.inputs.DEVICE_NAME }}"
         export ALLOW_MISSING_DEPENDENCIES=true
-        export TARGET_BUILD_UNBUNDLED=true
+        # TARGET_BUILD_UNBUNDLED disabled
         export SOONG_COLLECT_JAVA_RESOURCES=false
         export GOGC=25
         export GOMEMLIMIT=12GiB
 
-        source build/envsetup.sh
+        mkdir -p out/soong
+touch out/soong/api_fingerprint.txt
+source build/envsetup.sh
         lunch ${{ github.event.inputs.MAKEFILE_NAME }}-bp2a-eng || lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
 
         (
