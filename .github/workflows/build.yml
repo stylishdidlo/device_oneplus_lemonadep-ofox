@@ -62,15 +62,15 @@ jobs:
         large-packages: true
         swap-storage: false
 
-    - name: Configure Large 40GB Swap
+    - name: Configure 20GB Balanced Swap
       run: |
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /opt/ghc
         sudo rm -rf "/usr/local/share/boost"
         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
         sudo swapoff -a || true
-        # Create a true 40GB swap file on /mnt
-        sudo fallocate -l 40G /mnt/swapfile || sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=40960
+        # 20GB Swap balances memory needs with runner disk space limits
+        sudo fallocate -l 20G /mnt/swapfile || sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=20480
         sudo chmod 600 /mnt/swapfile
         sudo mkswap /mnt/swapfile
         sudo swapon /mnt/swapfile
@@ -112,6 +112,9 @@ jobs:
         cd ~/work
         repo init --depth=1 -u ${{ github.event.inputs.SYNC_URL }} -b ${{ github.event.inputs.MANIFEST_BRANCH }}
         repo sync -j$(nproc --all) --force-sync --no-clone-bundle --no-tags --optimized-fetch --prune
+        # Free git object caches after checkout to reclaim 25-30 GB of disk space before compiling!
+        rm -rf .repo/project-objects .repo/projects
+        df -h
 
     - name: Clone Device Trees
       run: |
@@ -132,6 +135,7 @@ jobs:
         export FOX_BUILD_DEVICE="${{ github.event.inputs.DEVICE_NAME }}"
         export ALLOW_MISSING_DEPENDENCIES=true
         export TARGET_BUILD_UNBUNDLED=true
+        export SOONG_COLLECT_JAVA_RESOURCES=false
         export GOGC=25
         export GOMEMLIMIT=12GiB
 
@@ -141,8 +145,9 @@ jobs:
         (
           while true; do
             sleep 45
-            echo "[Heartbeat $(date +%T)] Memory & Swap status:"
+            echo "[Heartbeat $(date +%T)] Memory, Swap & Disk status:"
             free -h
+            df -h /
           done
         ) &
         HEARTBEAT_PID=$!
