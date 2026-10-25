@@ -62,18 +62,25 @@ jobs:
         large-packages: true
         swap-storage: false
 
-    - name: Maximize Build Space and Configure Swap
+    - name: Maximize Build Space and Configure Fast Swap & zRAM
       run: |
         sudo rm -rf /usr/share/dotnet
         sudo rm -rf /opt/ghc
         sudo rm -rf "/usr/local/share/boost"
         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
         sudo swapoff -a || true
-        sudo fallocate -l 32G /mnt/swapfile || sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=32768
+        # Setup zRAM for fast in-memory compressed swap
+        sudo modprobe zram num_devices=1 || true
+        echo lz4 | sudo tee /sys/block/zram0/comp_algorithm || true
+        echo 16G | sudo tee /sys/block/zram0/disksize || true
+        sudo mkswap /dev/zram0 || true
+        sudo swapon -p 10 /dev/zram0 || true
+        # Backup disk swap file with low priority
+        sudo fallocate -l 16G /mnt/swapfile || sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=16384
         sudo chmod 600 /mnt/swapfile
         sudo mkswap /mnt/swapfile
-        sudo swapon /mnt/swapfile
-        sudo sysctl vm.swappiness=100
+        sudo swapon -p 1 /mnt/swapfile
+        sudo sysctl vm.swappiness=80
         sudo sysctl vm.vfs_cache_pressure=50
         free -h
         df -h
@@ -131,22 +138,23 @@ jobs:
         export FOX_BUILD_DEVICE="${{ github.event.inputs.DEVICE_NAME }}"
         export ALLOW_MISSING_DEPENDENCIES=true
         export GOGC=30
-        export GOMEMLIMIT=10GiB
+        export GOMEMLIMIT=8GiB
 
         source build/envsetup.sh
         lunch ${{ github.event.inputs.MAKEFILE_NAME }}-bp2a-eng || lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
 
+        # Background heartbeat printing stats every 45s
         (
           while true; do
-            sleep 60
-            echo "[Heartbeat $(date +%T)] Memory & Swap:"
+            sleep 45
+            echo "[Heartbeat $(date +%T)] Memory & Swap status:"
             free -h
           done
         ) &
         HEARTBEAT_PID=$!
 
-        export NINJA_ARGS="-j2"
-        # Run mka with full tee to a persistent log file so it is never lost
+        # Limit load average so GitHub Actions agent never chokes or gets terminated by hypervisor
+        export NINJA_ARGS="-j2 -l2.5"
         set +e
         mka ${{ github.event.inputs.BUILD_TARGET }} -j2 2>&1 | tee ~/build.log
         BUILD_STATUS=${PIPESTATUS[0]}
@@ -154,8 +162,8 @@ jobs:
         kill $HEARTBEAT_PID || true
         ccache -s
 
-        echo "=== LAST 150 LINES OF BUILD LOG ==="
-        tail -n 150 ~/build.log
+        echo "=== LAST 200 LINES OF BUILD LOG ==="
+        tail -n 200 ~/build.log
 
         if [ $BUILD_STATUS -ne 0 ]; then
           echo "ERROR: mka failed with code $BUILD_STATUS"
