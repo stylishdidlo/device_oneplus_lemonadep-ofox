@@ -50,6 +50,19 @@ on:
         required: true
         default: 'bootimage'
 
+env:
+  SYNC_URL: ${{ github.event.inputs.SYNC_URL || 'https://gitlab.com/OrangeFox/Manifest.git' }}
+  MANIFEST_BRANCH: ${{ github.event.inputs.MANIFEST_BRANCH || 'fox_16.0' }}
+  DEVICE_TREE_URL: ${{ github.event.inputs.DEVICE_TREE_URL || 'https://github.com/stylishdidlo/device_oneplus_lemonadep-ofox' }}
+  DEVICE_TREE_BRANCH: ${{ github.event.inputs.DEVICE_TREE_BRANCH || 'fox_16.0' }}
+  DEVICE_PATH: ${{ github.event.inputs.DEVICE_PATH || 'device/oneplus/lemonadep' }}
+  COMMON_TREE_URL: ${{ github.event.inputs.COMMON_TREE_URL || 'https://github.com/stylishdidlo/android_device_oneplus_sm8350-common' }}
+  COMMON_TREE_BRANCH: ${{ github.event.inputs.COMMON_TREE_BRANCH || 'android-12.1' }}
+  COMMON_PATH: ${{ github.event.inputs.COMMON_PATH || 'device/oneplus/sm8350-common' }}
+  DEVICE_NAME: ${{ github.event.inputs.DEVICE_NAME || 'lemonadep' }}
+  MAKEFILE_NAME: ${{ github.event.inputs.MAKEFILE_NAME || 'twrp_lemonadep' }}
+  BUILD_TARGET: ${{ github.event.inputs.BUILD_TARGET || 'bootimage' }}
+
 jobs:
   build:
     runs-on: ubuntu-22.04
@@ -71,7 +84,6 @@ jobs:
         sudo rm -rf "/usr/local/share/boost"
         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
         sudo swapoff -a || true
-        # 20GB Swap balances memory needs with runner disk space limits
         sudo fallocate -l 20G /mnt/swapfile || sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=20480
         sudo chmod 600 /mnt/swapfile
         sudo mkswap /mnt/swapfile
@@ -112,19 +124,18 @@ jobs:
       run: |
         mkdir -p ~/work
         cd ~/work
-        repo init --depth=1 -u ${{ github.event.inputs.SYNC_URL }} -b ${{ github.event.inputs.MANIFEST_BRANCH }}
+        repo init --depth=1 -u $SYNC_URL -b $MANIFEST_BRANCH
         repo sync -j$(nproc --all) --force-sync --no-clone-bundle --no-tags --optimized-fetch --prune
-        # Free git object caches after checkout to reclaim 25-30 GB of disk space before compiling!
         rm -rf .repo/project-objects .repo/projects
         df -h
 
     - name: Clone Device Trees
       run: |
         cd ~/work
-        rm -rf ${{ github.event.inputs.DEVICE_PATH }}
-        rm -rf ${{ github.event.inputs.COMMON_PATH }}
-        git clone --depth=1 -b ${{ github.event.inputs.DEVICE_TREE_BRANCH }} ${{ github.event.inputs.DEVICE_TREE_URL }} ${{ github.event.inputs.DEVICE_PATH }}
-        git clone --depth=1 -b ${{ github.event.inputs.COMMON_TREE_BRANCH }} ${{ github.event.inputs.COMMON_TREE_URL }} ${{ github.event.inputs.COMMON_PATH }}
+        rm -rf $DEVICE_PATH
+        rm -rf $COMMON_PATH
+        git clone --depth=1 -b $DEVICE_TREE_BRANCH $DEVICE_TREE_URL $DEVICE_PATH
+        git clone --depth=1 -b $COMMON_TREE_BRANCH $COMMON_TREE_URL $COMMON_PATH
 
     - name: Build OrangeFox
       run: |
@@ -134,20 +145,24 @@ jobs:
         export CCACHE_EXEC=/usr/bin/ccache
         ccache -M 10G
         ccache -z
-        export FOX_BUILD_DEVICE="${{ github.event.inputs.DEVICE_NAME }}"
+        export FOX_BUILD_DEVICE="$DEVICE_NAME"
         export ALLOW_MISSING_DEPENDENCIES=true
-        # TARGET_BUILD_UNBUNDLED disabled
         export SOONG_COLLECT_JAVA_RESOURCES=false
         export GOGC=25
         export GOMEMLIMIT=12GiB
 
+        source build/envsetup.sh
+        lunch ${MAKEFILE_NAME}-bp2a-eng || lunch ${MAKEFILE_NAME}-eng
+
         mkdir -p out/soong
-touch out/soong/api_fingerprint.txt
-source build/envsetup.sh
-        lunch ${{ github.event.inputs.MAKEFILE_NAME }}-bp2a-eng || lunch ${{ github.event.inputs.MAKEFILE_NAME }}-eng
+        echo "16" > out/soong/api_fingerprint.txt
 
         (
           while true; do
+            if [ ! -f out/soong/api_fingerprint.txt ]; then
+              mkdir -p out/soong
+              echo "16" > out/soong/api_fingerprint.txt 2>/dev/null || true
+            fi
             sleep 45
             echo "[Heartbeat $(date +%T)] Memory, Swap & Disk status:"
             free -h
@@ -158,7 +173,7 @@ source build/envsetup.sh
 
         export NINJA_ARGS="-j2 -l2.0"
         set +e
-        mka ${{ github.event.inputs.BUILD_TARGET }} -j2 2>&1 | tee ~/build.log
+        mka $BUILD_TARGET -j2 2>&1 | tee ~/build.log
         BUILD_STATUS=${PIPESTATUS[0]}
         set -e
         kill $HEARTBEAT_PID || true
@@ -176,22 +191,22 @@ source build/envsetup.sh
       run: |
         cd ~/work
         mkdir -p ~/artifacts
-        find out/target/product/${{ github.event.inputs.DEVICE_NAME }}/ -name "OrangeFox*.zip" -exec cp {} ~/artifacts/ \;
-        find out/target/product/${{ github.event.inputs.DEVICE_NAME }}/ -name "boot.img" -exec cp {} ~/artifacts/OrangeFox-boot-${{ github.event.inputs.DEVICE_NAME }}.img \;
-        find out/target/product/${{ github.event.inputs.DEVICE_NAME }}/ -name "recovery.img" -exec cp {} ~/artifacts/OrangeFox-recovery-${{ github.event.inputs.DEVICE_NAME }}.img \;
-        find out/target/product/${{ github.event.inputs.DEVICE_NAME }}/ -name "vendor_boot.img" -exec cp {} ~/artifacts/OrangeFox-vendor_boot-${{ github.event.inputs.DEVICE_NAME }}.img \;
+        find out/target/product/$DEVICE_NAME/ -name "OrangeFox*.zip" -exec cp {} ~/artifacts/ \;
+        find out/target/product/$DEVICE_NAME/ -name "boot.img" -exec cp {} ~/artifacts/OrangeFox-boot-$DEVICE_NAME.img \;
+        find out/target/product/$DEVICE_NAME/ -name "recovery.img" -exec cp {} ~/artifacts/OrangeFox-recovery-$DEVICE_NAME.img \;
+        find out/target/product/$DEVICE_NAME/ -name "vendor_boot.img" -exec cp {} ~/artifacts/OrangeFox-vendor_boot-$DEVICE_NAME.img \;
         ls -la ~/artifacts
 
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: OrangeFox-${{ github.event.inputs.DEVICE_NAME }}-Android16
+        name: OrangeFox-${{ env.DEVICE_NAME }}-Android16
         path: ~/artifacts/*
         if-no-files-found: error
 
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+      if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || github.event_name == 'push'
       with:
         files: ~/artifacts/*
         tag_name: Fox16-${{ github.run_number }}
