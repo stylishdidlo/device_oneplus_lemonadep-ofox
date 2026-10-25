@@ -11,7 +11,6 @@ PRODUCT_AAPT_PREF_CONFIG := xxxhdpi
 TARGET_SCREEN_HEIGHT := 3168
 TARGET_SCREEN_WIDTH := 1440
 
-
 # Soong namespaces
 PRODUCT_SOONG_NAMESPACES += \
     $(LOCAL_PATH)
@@ -68,11 +67,9 @@ TW_BRIGHTNESS_PATH := /sys/class/backlight/panel0-backlight/brightness
 TW_DEFAULT_BRIGHTNESS := 1500
 TW_MAX_BRIGHTNESS := 4095
 
-TW_SUPPORT_INPUT_AIDL_HAPTICS := true
-
 TW_LOAD_VENDOR_MODULES := "aw8697.ko adsp_loader_dlkm.ko oplus_chg.ko touchscreen.ko haptic.ko"
 
-#Properties
+# Properties
 TW_OVERRIDE_SYSTEM_PROPS := \
     "ro.build.fingerprint=ro.system.build.fingerprint;ro.build.version.incremental"
 
@@ -81,21 +78,12 @@ TARGET_RECOVERY_DEVICE_MODULES += libion \
     system_manifest.xml \
     vendor.display.config@2.0.vendor \
     libdisplayconfig.qti \
-    vendor.qti.hardware.vibrator.service.oplus \
     libdrm.vendor
-
-RECOVERY_BINARY_SOURCE_FILES += \
-    $(TARGET_OUT_VENDOR_EXECUTABLES)/hw/vendor.qti.hardware.vibrator.service.oplus
 
 RECOVERY_LIBRARY_SOURCE_FILES += \
     $(TARGET_OUT_SHARED_LIBRARIES)/libion.so \
-    $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)/vendor.qti.hardware.vibrator.impl.oplus.so \
     $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)/vendor.display.config@2.0.so \
     $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)/libdrm.so
-
-PRODUCT_COPY_FILES += \
-    vendor/qcom/opensource/vibrator/excluded-input-devices.xml:$(TARGET_COPY_OUT_RECOVERY)/root/system/etc/excluded-input-devices.xml \
-    vendor/qcom/opensource/vibrator/excluded-input-devices.xml:$(TARGET_COPY_OUT_RECOVERY)/root/vendor/etc/excluded-input-devices.xml
 
 PRODUCT_COPY_FILES += $(call find-copy-subdir-files,*,device/oneplus/sm8350-common/prebuilt/modules,$(TARGET_COPY_OUT_RECOVERY)/root/vendor/lib/modules/1.1)
 
