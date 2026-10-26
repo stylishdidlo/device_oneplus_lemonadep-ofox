@@ -115,7 +115,7 @@ jobs:
       id: ccache
       uses: actions/cache@v4
       with:
-        path: ~/.ccache
+        path: ~/work/out/.ccache
         key: ${{ runner.os }}-fox16-ccache-${{ github.sha }}
         restore-keys: |
           ${{ runner.os }}-fox16-ccache-
@@ -141,7 +141,10 @@ jobs:
       run: |
         cd ~/work
         export USE_CCACHE=1
-        export CCACHE_DIR=~/.ccache
+        export CCACHE_BASEDIR=/home/runner/work
+        export CCACHE_NOHASHDIR=1
+        mkdir -p /home/runner/work/out/.ccache
+        export CCACHE_DIR=/home/runner/work/out/.ccache
         export CCACHE_EXEC=/usr/bin/ccache
         ccache -M 10G
         ccache -z
