@@ -90,3 +90,5 @@ PRODUCT_COPY_FILES += $(call find-copy-subdir-files,*,device/oneplus/sm8350-comm
 PRODUCT_COPY_FILES += \
     $(OUT_DIR)/target/product/lemonadep/system/etc/vintf/manifest.xml:$(TARGET_COPY_OUT_RECOVERY)/root/system/etc/vintf/manifest.xml \
     $(OUT_DIR)/target/product/lemonadep/vendor/etc/vintf/manifest.xml:$(TARGET_COPY_OUT_RECOVERY)/root/vendor/etc/vintf/manifest.xml
+# Kernel 5.4 does not support Android 16 default UFFD GC
+PRODUCT_ENABLE_UFFD_GC := false
