@@ -157,6 +157,11 @@ jobs:
         source build/envsetup.sh
         lunch ${MAKEFILE_NAME}-bp2a-eng || lunch ${MAKEFILE_NAME}-eng
 
+        # Fix UFFD GC check in build/make/tools/post_process_props.py for kernel 5.4
+        find build -name "post_process_props.py" -exec sed -i 's/sys.exit(f"Unable to determine UFFD GC flag/print(f"Warning: UFFD GC/g' {} + || true
+        find build -name "post_process_props.py" -exec sed -i '/Unable to determine UFFD GC flag/{n;d}' {} + || true
+        find build -name "post_process_props.py" -exec sed -i 's/sys.exit(1)/pass/g' {} + || true
+
         mkdir -p out/soong
         echo "16" > out/soong/api_fingerprint.txt
 
